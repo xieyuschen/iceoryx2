@@ -1,0 +1,5 @@
+# .miri_allowlist use hash character to lead a comment
+# each line will be treated as a valid path to enter and run 'cargo miri test'
+# note that each line should end up with a newline character,
+# otherwise the ci shell will skip the last line
+./iceoryx2-bb/testing
