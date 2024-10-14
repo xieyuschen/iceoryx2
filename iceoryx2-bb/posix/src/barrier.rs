@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Inter-process capable [`Barrier`] which blocks a previously defined number of waiters
-//! untilthe all the waiters reached [`Barrier::wait()`]
+//! untilall the waiters reached [`Barrier::wait()`]
 //!
 //! # Examples
 //!
@@ -213,7 +213,7 @@ impl<'a> Barrier<'a> {
 }
 
 impl<'a> IpcConstructible<'a, BarrierHandle> for Barrier<'a> {
-    fn new(handle: &'a BarrierHandle) -> Barrier {
+    fn new(handle: &'a BarrierHandle) -> Barrier<'a>{
         Barrier { handle }
     }
 }
