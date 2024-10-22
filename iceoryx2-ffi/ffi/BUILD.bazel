@@ -20,9 +20,19 @@ filegroup(
     srcs = glob(["**"]),
 )
 
-filegroup(
+
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+
+rust_binary(
     name = "cbindgen-cli",
-    srcs = ["@cbindgen//file"],
+    srcs = [
+        "external/cbindgen_source/src/main.rs",
+        "external/cbindgen_source/build.rs",
+    ],
+    data = [
+        "external/cbindgen_source/Cargo.toml",
+        "external/cbindgen_source/Cargo.lock",
+    ],
 )
 
 genrule(

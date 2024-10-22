@@ -35,15 +35,30 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+
+rust_binary(
+    name = "cbindgen-cli",
+    srcs = [
+        "external/cbindgen_source/src/main.rs",
+        "external/cbindgen_source/build.rs",
+    ],
+    data = [
+        "external/cbindgen_source/Cargo.toml",
+        "external/cbindgen_source/Cargo.lock",
+    ],
+)
+
 # Generate the Rust binding file
 genrule(
     name = "iceoryx2-pal-posix-bindgen",
     srcs = [
         "src/c/posix.h",
-        "@bindgen//:bindgen-cli",
+        ":cbindgen-cli",
     ],
     outs = ["posix_generated.rs"],
-    cmd = "$(execpath @bindgen//:bindgen-cli) --use-core --blocklist-type max_align_t $(location src/c/posix.h) --output $(OUTS)",
+    cmd = "$(execpath :cbindgen-cli) --use-core --blocklist-type max_align_t $(location src/c/posix.h) --output $(OUTS)",
 )
 
 cargo_build_script(
@@ -75,6 +90,7 @@ rust_library(
 rust_test_suite(
     name = "iceoryx2-pal-posix-tests",
     srcs = glob(["tests/**/*.rs"]),
+    crate_features = [ "testing" ],
     deps = [
         ":iceoryx2-pal-posix",
         "//iceoryx2-bb/container:iceoryx2-bb-container",
