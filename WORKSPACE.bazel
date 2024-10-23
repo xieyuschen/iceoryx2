@@ -70,9 +70,30 @@ rust_repositories()
 http_archive(
     name = "cbindgen_source",
     urls = ["https://github.com/mozilla/cbindgen/archive/refs/tags/0.26.0.tar.gz"],
+    strip_prefix = "cbindgen-0.26.0",  # Adjust based on the actual directory in the tarball
+    build_file_content = """
+filegroup(
+    name = "srcs",
+    srcs = glob(["src/**/*.rs", "build.rs", "Cargo.toml",  "Cargo.lock"]),
+    visibility = ["//visibility:public"],
+        
+)
+exports_files(["Cargo.toml", "Cargo.lock"], visibility = ["//visibility:public"])
+"""
 )
 
 load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+
+crates_repository(
+    name = "cbindgen_deps",
+    cargo_lockfile = "@cbindgen_source//:Cargo.lock",
+    manifests = ["@cbindgen_source//:Cargo.toml"],
+)
+
+load("@cbindgen_deps//:defs.bzl", cbindgen_deps = "crate_repositories")
+
+cbindgen_deps()
 
 
 # Load prebuilt cbindgen
