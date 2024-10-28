@@ -10,7 +10,6 @@ mod sets_bench_test {
     };
 
     use iceoryx2_bb_lock_free::mpmc::bit_set::BitSet;
-    use iceoryx2_bb_posix::system_configuration::SystemInfo;
     use test::Bencher;
 
     struct LockSet {
@@ -148,74 +147,94 @@ mod mpmc_container_bench_test {
 }
 
 #[cfg(test)]
-mod mpmc_container_1bench_test2 {
-    use std::sync::{Arc, Barrier, Mutex};
+mod spsc_queue_bench_test {
+    use std::{sync::{Arc, Mutex}, thread};
 
-    use iceoryx2_bb_lock_free::mpmc::container::FixedSizeContainer;
+    use iceoryx2_bb_lock_free::spsc::queue::Queue;
     use test::Bencher;
 
-    struct LockContainer {
+    struct LockIndexQueue {
         v: Arc<Mutex<Vec<i64>>>,
     }
-    impl LockContainer {
+    impl LockIndexQueue {
         fn new() -> Self {
-            return LockContainer {
+            return LockIndexQueue {
                 v: Arc::new(Mutex::new(vec![])),
             };
         }
-        fn add(&self, v: i64) -> usize {
-            let mut l = self.v.lock().unwrap();
-            l.push(v);
-            let len = l.len();
-            drop(l);
-            len
+        fn push(&self, v: i64) -> bool{
+            self.v.lock().unwrap().push(v);
+            true
+        }
+        fn pop(&self)-> Option<i64> {
+            self.v.lock().unwrap().pop()
         }
     }
-    static TURN: usize = 10000;
-
+    
     #[bench]
-    fn bench_lock_container(b: &mut Bencher) {
+    fn bench_lock_queue(b: &mut Bencher) {
         b.iter(|| {
-            let set = &LockContainer::new();
-            let barrier = &Barrier::new(TURN + 1);
-
-            std::thread::scope(|s| {
-                // todo: write a note about why set_thread cannot be put outside
-                let mut set_threads = vec![];
-                for i in 0..TURN {
-                    set_threads.push(s.spawn(move || {
-                        // todo: we can not move if the set and barrier is not reference
-                        barrier.wait();
-                        set.add(i as i64);
-                    }));
-                }
-                barrier.wait();
-                for t in set_threads {
-                    t.join().unwrap();
-                }
+            const LIMIT: i64 = 10000;
+        
+            let sut = LockIndexQueue::new();
+            
+            thread::scope(|s| {
+                s.spawn(|| {
+                    let mut counter: i64 = 0;
+                    while counter <= LIMIT {
+                        if sut.push(counter.clone()) {
+                            counter += 1;
+                        }
+                    }
+                });
+        
+                s.spawn(|| {
+                    loop {
+                        match sut.pop() {
+                            Some(v) => {
+                                if v == LIMIT {
+                                    return;
+                                }
+                            }
+                            None => (),
+                        }
+                    }
+                });
             });
         });
     }
     #[bench]
-    fn bench_lockfree_container(b: &mut Bencher) {
+    fn bench_lockfree_queue(b: &mut Bencher) {
         b.iter(|| {
-            let sut = &FixedSizeContainer::<usize, TURN>::new();
-            let barrier = &Barrier::new(TURN + 1);
-
-            std::thread::scope(|s| {
-                let mut set_threads = vec![];
-                for i in 0..TURN {
-                    set_threads.push(s.spawn(move || {
-                        barrier.wait();
-                        unsafe {
-                            sut.add(i as usize).unwrap();
+            const LIMIT: i64 = 10000;
+            const CAPACITY: usize = 1024;
+        
+            let sut = Queue::<i64, CAPACITY>::new();
+            let mut sut_producer = sut.acquire_producer().unwrap();
+            let mut sut_consumer = sut.acquire_consumer().unwrap();
+            
+            thread::scope(|s| {
+                s.spawn(|| {
+                    let mut counter: i64 = 0;
+                    while counter <= LIMIT {
+                        if sut_producer.push(&counter) {
+                            counter += 1;
                         }
-                    }));
-                }
-                barrier.wait();
-                for t in set_threads {
-                    t.join().unwrap();
-                }
+                    }
+                });
+        
+                s.spawn(|| {
+                    loop {
+                        match sut_consumer.pop() {
+                            Some(v) => {
+                                if v == LIMIT {
+                                    return;
+                                }
+                            }
+                            None => (),
+                        }
+                    }
+                });
             });
         });
     }
